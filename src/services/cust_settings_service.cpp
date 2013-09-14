@@ -6,10 +6,10 @@
 namespace trillek
 {
 
-cust_settings_service::cust_settings_service(client* _client)
+cust_settings_service::cust_settings_service(client* _client,std::string file)
     : settings_service(_client)
 {
-    //ctor
+    this->load(file);
 }
 
 cust_settings_service::~cust_settings_service()

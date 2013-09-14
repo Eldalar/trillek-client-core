@@ -3,6 +3,7 @@
 #include "data/voxel_octree.h"
 #include "data/voxel_array.h"
 #include "data/basic_octree.h"
+#include "client.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -16,6 +17,7 @@
 #include <functional>
 #include <algorithm>
 #include <random>
+#include "system/voxel_material_system.h"
 
 namespace trillek {
 
@@ -40,30 +42,30 @@ voxel_octree voxelize_mesh(const triangle3d_vector& all_triangles);
  * @param out Z position of intersection if any
  * @return true if intersected, false otherwise
  */
-bool z_ray_intersection(const float_triangle3d& triangle, 
+bool z_ray_intersection(const float_triangle3d& triangle,
         const float_vector2d& xy, float& out);
-bool y_ray_intersection(const float_triangle3d& triangle, 
+bool y_ray_intersection(const float_triangle3d& triangle,
         const float_vector2d& zx, float& out);
-bool x_ray_intersection(const float_triangle3d& triangle, 
+bool x_ray_intersection(const float_triangle3d& triangle,
         const float_vector2d& yz, float& out);
-int x_compute_winding(const float_triangle2d& triangle, 
+int x_compute_winding(const float_triangle2d& triangle,
         const float_vector2d& xy);
-int y_compute_winding(const float_triangle2d& triangle, 
+int y_compute_winding(const float_triangle2d& triangle,
         const float_vector2d& xy);
-bool consistent_point_in_triangle(const float_triangle2d& triangle, 
+bool consistent_point_in_triangle(const float_triangle2d& triangle,
         const float_vector2d& xy);
 
 voxel_mesh_asset_loader::voxel_mesh_asset_loader() {}
 voxel_mesh_asset_loader::~voxel_mesh_asset_loader() {}
 data* voxel_mesh_asset_loader::load(const std::string& file) const {
     Assimp::Importer assimporter;
-    const aiScene* scene = 
+    const aiScene* scene =
             assimporter.ReadFile(file,
                                  aiProcess_JoinIdenticalVertices |
                                  aiProcess_OptimizeGraph |
                                  aiProcess_OptimizeMeshes |
                                  aiProcess_RemoveComponent |
-                                 aiProcess_Triangulate | 
+                                 aiProcess_Triangulate |
                                  aiProcess_PreTransformVertices);
     if(!scene) {
         throw std::runtime_error(assimporter.GetErrorString());
@@ -73,33 +75,33 @@ data* voxel_mesh_asset_loader::load(const std::string& file) const {
     //we ignore most things and process the meshes only
     for(std::size_t i = 0; i < scene->mNumMeshes; ++i) {
         const aiMesh& cur_mesh = *(scene->mMeshes[i]);
-        std::cerr << "Mesh " << i << " has " << cur_mesh.mNumFaces << 
+        std::cerr << "Mesh " << i << " has " << cur_mesh.mNumFaces <<
                 " faces" << std::endl;
         for(std::size_t face_i = 0; face_i < cur_mesh.mNumFaces; ++face_i) {
             const aiFace& face = cur_mesh.mFaces[face_i];
             float_triangle3d cur_face;
-            for(std::size_t vertex_i = 0; vertex_i < face.mNumIndices; 
+            for(std::size_t vertex_i = 0; vertex_i < face.mNumIndices;
                     ++vertex_i) {
                 assert(vertex_i < 3);
-                const aiVector3D& vertex = 
+                const aiVector3D& vertex =
                         cur_mesh.mVertices[face.mIndices[vertex_i]];
-                cur_face[vertex_i] = make_vector3d(vertex.x, 
-                                                   vertex.y, 
+                cur_face[vertex_i] = make_vector3d(vertex.x,
+                                                   vertex.y,
                                                    vertex.z);
             }
-            const float_vector3d normal_vector = 
+            const float_vector3d normal_vector =
                     (cur_face[1] - cur_face[0]).cross(
                     cur_face[2] - cur_face[0]).normalize();
             cur_face[3] = normal_vector;
             all_triangles.emplace_back(std::move(cur_face));
         }
     }
-    std::cerr << "Extracted " << all_triangles.size() 
+    std::cerr << "Extracted " << all_triangles.size()
             << " triangles" << std::endl;
     return new voxel_octree(voxelize_mesh(all_triangles));
 }
 
-bool z_ray_intersection(const float_triangle3d& triangle, 
+bool z_ray_intersection(const float_triangle3d& triangle,
         const float_vector2d& xy, float& out) {
     const float_triangle2d triangle2d = {{
             float_vector2d(triangle[0].x, triangle[0].y),
@@ -108,14 +110,14 @@ bool z_ray_intersection(const float_triangle3d& triangle,
     if(consistent_point_in_triangle(triangle2d, xy)) {
         const float_vector3d& norm = triangle[3];
         float_vector2d point = xy - triangle2d[0];
-        out = triangle[0].z - point.x * (norm.x / norm.z) - 
+        out = triangle[0].z - point.x * (norm.x / norm.z) -
                 point.y * (norm.y / norm.z);
         return true;
     } else {
         return false;
     }
 }
-bool y_ray_intersection(const float_triangle3d& triangle, 
+bool y_ray_intersection(const float_triangle3d& triangle,
         const float_vector2d& zx, float& out) {
     const float_triangle2d triangle2d = {{
             float_vector2d(triangle[0].z, triangle[0].x),
@@ -124,14 +126,14 @@ bool y_ray_intersection(const float_triangle3d& triangle,
     if(consistent_point_in_triangle(triangle2d, zx)) {
         const float_vector3d& norm = triangle[3];
         float_vector2d point = zx - triangle2d[0];
-        out = triangle[0].y - point.x * (norm.z / norm.y) - 
+        out = triangle[0].y - point.x * (norm.z / norm.y) -
                 point.y * (norm.x / norm.y);
         return true;
     } else {
         return false;
     }
 }
-bool x_ray_intersection(const float_triangle3d& triangle, 
+bool x_ray_intersection(const float_triangle3d& triangle,
         const float_vector2d& yz, float& out) {
     const float_triangle2d triangle2d = {{
             float_vector2d(triangle[0].y, triangle[0].z),
@@ -140,7 +142,7 @@ bool x_ray_intersection(const float_triangle3d& triangle,
     if(consistent_point_in_triangle(triangle2d, yz)) {
         const float_vector3d& norm = triangle[3];
         float_vector2d point = yz - triangle2d[0];
-        out = triangle[0].x - point.x * (norm.y / norm.x) - 
+        out = triangle[0].x - point.x * (norm.y / norm.x) -
                 point.y * (norm.z / norm.x);
         return true;
     } else {
@@ -148,7 +150,7 @@ bool x_ray_intersection(const float_triangle3d& triangle,
     }
 }
 
-int x_compute_winding(const float_triangle2d& triangle, 
+int x_compute_winding(const float_triangle2d& triangle,
         const float_vector2d& xy) {
     int ret = 0;
     for(std::size_t i = 0; i < 3; ++i) {
@@ -167,7 +169,7 @@ int x_compute_winding(const float_triangle2d& triangle,
     }
     return ret;
 }
-int y_compute_winding(const float_triangle2d& triangle, 
+int y_compute_winding(const float_triangle2d& triangle,
         const float_vector2d& xy) {
     //swap xy and invoke x_compute_winding
     auto swapxy = [](const float_vector2d& arg)->float_vector2d {
@@ -180,7 +182,7 @@ int y_compute_winding(const float_triangle2d& triangle,
     const float_vector2d yx = swapxy(xy);
     return x_compute_winding(triangle_yx, yx);
 }
-bool consistent_point_in_triangle(const float_triangle2d& triangle, 
+bool consistent_point_in_triangle(const float_triangle2d& triangle,
         const float_vector2d& xy) {
     std::normal_distribution<> norm(0.0, 0.01);
     float_vector2d cxy = xy;
@@ -229,7 +231,7 @@ voxel_octree voxelize_mesh(const triangle3d_vector& all_triangles) {
     };
     auto bucket_triangle = [&xyb, &yzb, &zxb, &min_xyz, &max_xyz](
             const float_vector3d& min_extents,
-            const float_vector3d& max_extents, 
+            const float_vector3d& max_extents,
             const float_triangle3d& arg)->std::size_t {
         std::size_t ret = 0;
         int_vector3d min_int(
@@ -264,23 +266,23 @@ voxel_octree voxelize_mesh(const triangle3d_vector& all_triangles) {
 //        }
         //old way filled the volume
         //new way fills the surface of the cube
-        for(int_vector3d::value_type x = min_int.x; 
+        for(int_vector3d::value_type x = min_int.x;
                 x != max_int.x; ++x) {
-            for(int_vector3d::value_type y = min_int.y; 
+            for(int_vector3d::value_type y = min_int.y;
                     y != max_int.y; ++y) {
                 xyb[int_vector2d(x,y)].push_back(std::ref(arg));
             }
         }
-        for(int_vector3d::value_type y = min_int.y; 
+        for(int_vector3d::value_type y = min_int.y;
                 y != max_int.y; ++y) {
-            for(int_vector3d::value_type z = min_int.z; 
+            for(int_vector3d::value_type z = min_int.z;
                     z != max_int.z; ++z) {
                 yzb[int_vector2d(y, z)].push_back(std::ref(arg));
             }
         }
-        for(int_vector3d::value_type z = min_int.z; 
+        for(int_vector3d::value_type z = min_int.z;
                 z != max_int.z; ++z) {
-            for(int_vector3d::value_type x = min_int.x; 
+            for(int_vector3d::value_type x = min_int.x;
                     x != max_int.x; ++x) {
                 zxb[int_vector2d(z, x)].push_back(std::ref(arg));
             }
@@ -291,13 +293,13 @@ voxel_octree voxelize_mesh(const triangle3d_vector& all_triangles) {
     for(const float_triangle3d& triangle : all_triangles) {
         float_vector3d min_extents, max_extents;
         std::tie(min_extents, max_extents) = triangle_extents(triangle);
-        //std::cerr << 
+        //std::cerr <<
                 bucket_triangle(min_extents, max_extents, triangle);
         //std::cerr << ", ";
     }
-    std::cerr << "Bucket counts are " << 
-            "\n\t" << xyb.size() << 
-            "\n\t" << yzb.size() << 
+    std::cerr << "Bucket counts are " <<
+            "\n\t" << xyb.size() <<
+            "\n\t" << yzb.size() <<
             "\n\t" << zxb.size() << std::endl;
     voxel_data::size_vector3d size_extent = (max_xyz - min_xyz);
     voxel_array_alternate xyvox, yzvox, zxvox;
@@ -310,22 +312,22 @@ voxel_octree voxelize_mesh(const triangle3d_vector& all_triangles) {
         crossing_vector crossings;
         for(const float_triangle3d& triangle : xyvt.second) {
             float_vector3d::value_type crossing;
-            if(z_ray_intersection(triangle, xyvt.first + xy_center, 
+            if(z_ray_intersection(triangle, xyvt.first + xy_center,
                     crossing)) {
                 crossings.push_back(crossing);
             }
         }
         std::sort(crossings.begin(), crossings.end());
         for(std::size_t i = 0; i + 1 < crossings.size(); ++i) {
-            for(float coord = crossings[i]; coord < crossings[i + 1]; 
+            for(float coord = crossings[i]; coord < crossings[i + 1];
                     ++coord) {
-                int_vector3d::value_type coord_i = 
+                int_vector3d::value_type coord_i =
                         static_cast<int_vector3d::value_type>(coord + 0.5);
                 xyvox.set_voxel(
-                        xyvt.first.x - min_xyz.x, 
-                        xyvt.first.y - min_xyz.y, 
-                        coord_i - min_xyz.z, 
-                        voxel(true, true));
+                        xyvt.first.x - min_xyz.x,
+                        xyvt.first.y - min_xyz.y,
+                        coord_i - min_xyz.z,
+                        voxel_material_system::get().get_default_solid());
             }
         }
     }
@@ -342,15 +344,15 @@ voxel_octree voxelize_mesh(const triangle3d_vector& all_triangles) {
         }
         std::sort(crossings.begin(), crossings.end());
         for(std::size_t i = 0; i + 1 < crossings.size(); ++i) {
-            for(float coord = crossings[i]; coord < crossings[i + 1]; 
+            for(float coord = crossings[i]; coord < crossings[i + 1];
                     ++coord) {
-                int_vector3d::value_type coord_i = 
+                int_vector3d::value_type coord_i =
                         static_cast<int_vector3d::value_type>(coord + 0.5);
                 yzvox.set_voxel(
-                        coord_i - min_xyz.x, 
+                        coord_i - min_xyz.x,
                         yzvt.first.x - min_xyz.y,
-                        yzvt.first.y - min_xyz.z, 
-                        voxel(true, true));
+                        yzvt.first.y - min_xyz.z,
+                        voxel_material_system::get().get_default_solid());
             }
         }
     }
@@ -367,15 +369,15 @@ voxel_octree voxelize_mesh(const triangle3d_vector& all_triangles) {
         }
         std::sort(crossings.begin(), crossings.end());
         for(std::size_t i = 0; i + 1 < crossings.size(); ++i) {
-            for(float coord = crossings[i]; coord < crossings[i + 1]; 
+            for(float coord = crossings[i]; coord < crossings[i + 1];
                     ++coord) {
-                int_vector3d::value_type coord_i = 
+                int_vector3d::value_type coord_i =
                         static_cast<int_vector3d::value_type>(coord + 0.5);
                 zxvox.set_voxel(
-                        zxvt.first.y - min_xyz.x, 
+                        zxvt.first.y - min_xyz.x,
                         coord_i - min_xyz.y,
-                        zxvt.first.x - min_xyz.z, 
-                        voxel(true, true));
+                        zxvt.first.x - min_xyz.z,
+                        voxel_material_system::get().get_default_solid());
             }
         }
     }
@@ -389,32 +391,37 @@ voxel_octree voxelize_mesh(const triangle3d_vector& all_triangles) {
         for(std::size_t y = 0; y < size_extent.y; ++y) {
             for(std::size_t x = 0; x < size_extent.x; ++x) {
                 int count = 0;
-                if(xyvox.get_voxel(x,y,z).is_opaque()) {
+                if(xyvox.get_voxel(x,y,z).is_solid()) {
                     ++count;
                     ++xy_count;
                 }
-                if(yzvox.get_voxel(x,y,z).is_opaque()) {
+                if(yzvox.get_voxel(x,y,z).is_solid()) {
                     ++count;
                     ++yz_count;
                 }
-                if(zxvox.get_voxel(x,y,z).is_opaque()) {
+                if(zxvox.get_voxel(x,y,z).is_solid()) {
                     ++count;
                     ++zx_count;
                 }
                 if(count == 3) {
-                    ret.set_voxel(x, y, z, voxel(true, true));
+                    ret.set_voxel(x, y, z,
+                        voxel_material_system::get().get_default_solid());
                 }
             }
         }
     }
-    std::cerr << "Voxel counts are: " << 
-            "\n\t" << xy_count << 
-            "\n\t" << yz_count << 
+    std::cerr << "Voxel counts are: " <<
+            "\n\t" << xy_count <<
+            "\n\t" << yz_count <<
             "\n\t" << zx_count << std::endl;
     std::cerr << "Final result has filled volume " << ret.get_opaque_volume()
             << std::endl;
     std::cerr << "Final result has nodes " << ret.get_num_nodes() << std::endl;
     return ret;
+}
+
+void voxel_mesh_asset_loader::init()
+{
 }
 
 }

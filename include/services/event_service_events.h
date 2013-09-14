@@ -17,12 +17,28 @@ struct event
         key,
         mouse_move,
         mouse_button,
-        mouse_wheel
+        mouse_wheel,
+        exit
     };
     virtual event_type get_type()=0;
 };
 
 typedef std::shared_ptr<event> event_shared_ptr;
+
+/*
+    This is used for events, that don't need to deliver any
+    parameters
+*/
+struct short_event
+    : event
+{
+    event_type type;
+    short_event(event_type _type)
+        : type(_type)
+    {
+    }
+    event_type get_type(){return type;}
+};
 
 struct window_resized_event
     : event
@@ -40,12 +56,13 @@ struct window_resized_event
 struct key_event
     : event
 {
-    bool pressed;
+    bool pressed,continuation;
     keyboard::key_code code;
 
-    key_event(bool pressed, keyboard::key_code code)
+    key_event(bool pressed, bool continuation, keyboard::key_code code)
     {
-        this->pressed = pressed;
+        this->pressed=pressed;
+        this->continuation=continuation;
         this->code=code;
     }
     event_type get_type(){return event::key;}
@@ -54,12 +71,12 @@ struct key_event
 struct mouse_move_event
     : event
 {
-    int x,y;
+    int dx,dy;
 
-    mouse_move_event(int x, int y)
+    mouse_move_event(int dx, int dy)
     {
-        this->x=x;
-        this->y=y;
+        this->dx=dx;
+        this->dy=dy;
     }
     event_type get_type(){return event::mouse_move;}
 };

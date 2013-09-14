@@ -69,22 +69,34 @@ void opengl_graphics_service::receive_event(std::shared_ptr<event> e)
     }
 }
 
-void opengl_graphics_service::init()
+void opengl_graphics_service::_init()
 {
-    event_service* e_s=this->_client->get_event_service();
-    e_s->register_for_event(event::event_type::window_resized,
-                            this);
-    input_service* i_s=this->_client->get_input_service();
-    i_s->register_mouse_listener(this->cam);
+    event_service* e_s=
+        this->_client->declare_required_service<event_service>(this);
 
-    GLenum err = glewInit();
-    if (GLEW_OK != err)
+    if(e_s)
     {
-        /* Problem: glewInit failed, something is seriously wrong. */
-        std::cerr << "Error: Couldn't initialize GLEW because: "
-                  << glewGetErrorString(err) << std::endl;
-        assert(false);
+        e_s->register_for_event(event::event_type::window_resized,
+                                this);
+        this->cam->init();
     }
+
+    window_service* w_s=
+    this->_client->declare_required_service<window_service>(this);
+    if(w_s)
+    {
+        GLenum err = glewInit();
+        if (GLEW_OK != err)
+        {
+            //Problem: glewInit failed, something is seriously wrong.
+            std::cerr << "Error: Couldn't initialize GLEW because: "
+                      << glewGetErrorString(err) << std::endl;
+            assert(false);
+        }
+    }
+
+    this->_client->add_tick_method(client::post_render,
+                        std::bind(&opengl_graphics_service::render,this));
 }
 
 void opengl_graphics_service::rendering()
@@ -196,33 +208,41 @@ void opengl_graphics_service::register_model(uintptr_t ID,
     model_recall_data recall_data;
 
     // Vertex Data
-    std::vector<vertex_data>* vertices=data->get_vertex_data();
-    glGenBuffers(1,&recall_data.vertices);
-    glBindBuffer(GL_ARRAY_BUFFER, recall_data.vertices);
-    glBufferData(GL_ARRAY_BUFFER,
-                 vertices->size()*sizeof(vertex_data),
-                 &(*vertices)[0], GL_STATIC_DRAW);
-    recall_data.size=vertices->size();
+    std::map<material_data*,std::vector<vertex_data>>* vertices=
+            data->get_vertex_data();
+    for(auto& vertex : (*vertices))
+    {
+        glGenBuffers(1,&this->model_recall_buffer[ID][vertex.first].vertices);
+        glBindBuffer(GL_ARRAY_BUFFER,
+                     this->model_recall_buffer[ID][vertex.first].vertices);
+        glBufferData(GL_ARRAY_BUFFER,
+                     vertex.second.size()*sizeof(vertex_data),
+                     &(vertex.second)[0], GL_STATIC_DRAW);
+        this->model_recall_buffer[ID][vertex.first].size=vertex.second.size();
 
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glVertexPointer(3, GL_FLOAT, sizeof(vertex_data), 0);
-    glEnableClientState(GL_NORMAL_ARRAY);
-    glNormalPointer(GL_FLOAT, sizeof(vertex_data), (void*)12);
-
-    this->model_recall_buffer[ID] = recall_data;
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glVertexPointer(3, GL_FLOAT, sizeof(vertex_data), 0);
+        glEnableClientState(GL_NORMAL_ARRAY);
+        glNormalPointer(GL_FLOAT, sizeof(vertex_data), (void*)12);
+    }
 }
 
 bool opengl_graphics_service::is_model_registered(uintptr_t ID)
 {
     return this->model_recall_buffer.find(ID)!=this->model_recall_buffer.end();
 }
+void opengl_graphics_service::bind_material(material_data* material)
+{
+}
 
 void opengl_graphics_service::recall_model(uintptr_t ID)
 {
-    model_recall_data recall_data=this->model_recall_buffer[ID];
-
-    glBindBuffer(GL_ARRAY_BUFFER, recall_data.vertices);
-    glDrawArrays(GL_TRIANGLES,0,  recall_data.size);
+    for(auto& recall_data : this->model_recall_buffer[ID])
+    {
+        bind_material(recall_data.first);
+        glBindBuffer(GL_ARRAY_BUFFER, recall_data.second.vertices);
+        glDrawArrays(GL_TRIANGLES,0,  recall_data.second.size);
+    }
 }
 
 }

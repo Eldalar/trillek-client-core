@@ -3,11 +3,12 @@
 
 #include "services/service.h"
 #include "services/key_codes.h"
-#include "services/mouse_listener.h"
 #include <vector>
 
 namespace trillek
 {
+
+class event_service;
 
 class input_service : public service
 {
@@ -15,15 +16,16 @@ class input_service : public service
     public:
         input_service(client* _client);
         virtual ~input_service();
-        void init();
+        void _init() override;
+        void tick();
         void receive_event(std::shared_ptr<event> e);
         bool is_key_pressed(keyboard::key_code code){return keys_pressed[code];}
-        void register_mouse_listener(std::shared_ptr<mouse_listener> listener);
+        static constexpr char name[]="input";
     protected:
     private:
-        std::vector<std::shared_ptr<mouse_listener>> mouse_listeners;
+        event_service* events;
         bool trap_mouse;
-        void mouse_move(std::shared_ptr<mouse_move_event> e);
+        void mouse_move(std::shared_ptr<event> e);
         void toggle_trap_mouse();
 };
 

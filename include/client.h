@@ -8,6 +8,11 @@
 #include "services/settings_service.h"
 #include "services/asset_service.h"
 #include <iostream>
+#include <assert.h>
+#include <typeindex>
+#include <chrono>
+#include "general/string_exception.h"
+
 namespace trillek
 {
 
@@ -17,23 +22,76 @@ class client
         client();
         virtual ~client();
         void run();
-        event_service* get_event_service(){return events.get();}
-        graphics_service* get_graphics_service(){return graphics.get();}
-        input_service* get_input_service(){return input.get();}
-        settings_service* get_settings_service(){return settings.get();}
-        window_service* get_window_service(){return window.get();}
-        asset_service* get_asset_service(){return assets.get();}
+        template <typename T>
+        T* get_service()
+        {
+            if(this->services.find(T::name)!= this->services.end())
+            {
+                return dynamic_cast<T*>(this->services[T::name].get());
+            }
+
+            throw string_exception(
+                "Couldn't find "+std::string(T::name)+"-service");
+        }
+        template <typename T>
+        bool has_service()
+        {
+            return this->services.find(T::name)!= this->services.end();
+        }
+        template <typename T, typename... A>
+        void register_service(A... args)
+        {
+            if(this->services.find(T::name)!= this->services.end())
+            {
+                std::cerr <<
+                "Warning: Overwriting "+std::string(T::name)+"-service"
+                << std::endl;
+            }
+            this->services[T::name]=make_unique<T>(this,args...);
+        }
+
+        template<typename T>
+        T* declare_required_service(service* /*from*/=NULL)
+        {
+            if(!has_service<T>())
+            {
+                std::cerr << std::string(T::name) <<
+                    " was required but not present!" << std::endl;
+                requirement_error=true;
+                return NULL;
+            }else
+            {
+                T* retval = get_service<T>();
+                retval->init();
+                return retval;
+            }
+        }
+
+        enum tick_type
+        {
+            work,
+            pre_render,
+            render,
+            post_render
+        };
+        void add_tick_method(tick_type type,std::function<void()> tick_method);
+        void exit(std::shared_ptr<event> /*e*/){running=false;}
+        static client* current;
+        void log(std::string message);
+        std::chrono::microseconds current_frame_duration;
     protected:
     private:
-        std::unique_ptr<client> self;
-        std::unique_ptr<event_service> events;
-        std::unique_ptr<graphics_service> graphics;
-        std::unique_ptr<input_service> input;
-        std::unique_ptr<settings_service> settings;
-        std::unique_ptr<window_service> window;
-        std::unique_ptr<asset_service> assets;
+        std::chrono::time_point<std::chrono::high_resolution_clock> last_frame;
+        bool running;
+        std::map<std::string,std::unique_ptr<service>> services;
+        std::map<tick_type,std::vector<std::function<void()>>> tick_methods;
 
-        bool all_loaded();
+        bool requirement_error;
+        void init_all();
+        void init_time();
+        void update_time();
+        unsigned char max_framerate;
+        void limit_framerate();
 };
 
 }

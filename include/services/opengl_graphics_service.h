@@ -9,11 +9,12 @@ namespace trillek
 
 struct light_settings;
 
-struct  model_recall_data
+struct model_recall_data_entry
 {
     unsigned int vertices;
     unsigned int size;
 };
+typedef std::map<material_data*,model_recall_data_entry> model_recall_data;
 
 class opengl_graphics_service
     : public graphics_service
@@ -23,7 +24,7 @@ class opengl_graphics_service
             render_algorithm* rendering_algorithm, camera* cam);
         virtual ~opengl_graphics_service();
         void receive_event(std::shared_ptr<event> e);
-        void init();
+        void _init();
         void window_resized(float width, float height);
         void drawPolygon(   vector3d<float>& v1,
                             vector3d<float>& v2,
@@ -44,6 +45,7 @@ class opengl_graphics_service
         void register_model(uintptr_t ID, std::shared_ptr<mesh_data> model);
         bool is_model_registered(uintptr_t ID);
         void recall_model(uintptr_t ID);
+        void bind_material(material_data* material);
     protected:
     private:
         std::map<uintptr_t,model_recall_data> model_recall_buffer;

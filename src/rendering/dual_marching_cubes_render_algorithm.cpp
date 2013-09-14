@@ -6,6 +6,9 @@
 #include "math/axis_aligned_box.h"
 #include "general/count_unique_params.h"
 #include "general/min_max.h"
+#include "client.h"
+#include "system/voxel_material_system.h"
+
 namespace trillek
 {
 
@@ -50,7 +53,8 @@ std::size_t process_dual_cell_box(std::size_t cube_num,
         face_box.translate(type&0x1?min_size/2.0f:0,
                             type&0x2?min_size/2.0f:0,
                             type&0x4?min_size/2.0f:0);
-        marching_cubes_render_algorithm::step(face_box,cube_num,model,data);
+        marching_cubes_render_algorithm::step(face_box,cube_num,model,data,
+          voxel_material_system::get().get_default_solid());
     }
     return min_size;
 }
@@ -138,14 +142,16 @@ void dual_marching_cubes_render_algorithm::create_dual_cells(voxel_octree* n0,
                                              std::shared_ptr<mesh_data> model,
                                                              voxel_data* data)
 {
-    std::array<voxel,8> v = {{n0?n0->get_voxel():voxel(),
-                             n1?n1->get_voxel():voxel(),
-                             n2?n2->get_voxel():voxel(),
-                             n3?n3->get_voxel():voxel(),
-                             n4?n4->get_voxel():voxel(),
-                             n5?n5->get_voxel():voxel(),
-                             n6?n6->get_voxel():voxel(),
-                             n7?n7->get_voxel():voxel()}};
+    voxel nonsolid=
+    voxel_material_system::get().get_default_nonsolid();
+    std::array<voxel,8> v = {{n0?n0->get_voxel():nonsolid,
+                             n1?n1->get_voxel():nonsolid,
+                             n2?n2->get_voxel():nonsolid,
+                             n3?n3->get_voxel():nonsolid,
+                             n4?n4->get_voxel():nonsolid,
+                             n5?n5->get_voxel():nonsolid,
+                             n6?n6->get_voxel():nonsolid,
+                             n7?n7->get_voxel():nonsolid}};
     std::array<voxel_octree*,8> n={{n0,n1,n2,n3,n4,n5,n6,n7}};
     // First the cube_num is calculated, since we can skip the entire rest of
     // this function if the cube is entirely full(255) or empty(0)
@@ -184,7 +190,8 @@ void dual_marching_cubes_render_algorithm::create_dual_cells(voxel_octree* n0,
     axis_aligned_box center_box(new_center,vector3d<std::size_t>(size,
                                                                  size,
                                                                  size));
-    marching_cubes_render_algorithm::step(center_box,cube_num,model,data);
+    marching_cubes_render_algorithm::step(center_box,cube_num,model,data,
+          voxel_material_system::get().get_default_solid());
 
     // Edges and Faces only need to be computed if that corner is not
     // completely filled by the box above, as in one of the nodes at
@@ -508,7 +515,10 @@ void dual_marching_cubes_render_algorithm::process(voxel_model* node,graphics_se
     std::shared_ptr<mesh_data> model = std::make_shared<mesh_data>();
 
     voxel_data* r_d = node->get_render_data();
+
+    std::cerr << "Octree-conversion start" << std::endl;
     voxel_octree* octree = voxel_octree::convert(r_d);
+    std::cerr << "Octree-conversion end" << std::endl;
     nodeProc(octree,model,r_d);
     handle_borders(model,r_d);
     service->register_model((uintptr_t)node,model);

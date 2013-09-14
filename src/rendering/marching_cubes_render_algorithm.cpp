@@ -6,6 +6,9 @@
 #include <rendering/marching_cubes_lookup_table.h>
 #include <services/graphics_service.h>
 #include <array>
+#include "client.h"
+#include "system/voxel_material_system.h"
+
 namespace trillek
 {
 
@@ -18,11 +21,34 @@ marching_cubes_render_algorithm::~marching_cubes_render_algorithm()
 {
     //dtor
 }
+
+std::map<material_data*,unsigned char> marching_cubes_render_algorithm::
+        materials_to_cube_nums(std::array<material_data*,8> m)
+{
+    std::map<material_data*,unsigned char> retval;
+
+    for(int i=0; i<8;++i)
+    {
+        if(m[i]->is_solid()&&
+           retval.find(m[i])==retval.end())
+        {
+            std::array<bool,8> v;
+            for(int i2=0;i2<8;i2++)
+            {
+                v[i2]=(m[i]==m[i2]);
+            }
+            retval[m[i]]=values_to_cube_num(v);
+        }
+    }
+
+    return retval;
+}
+
 unsigned char marching_cubes_render_algorithm::
-              values_to_cube_num(uint16_t v0,uint16_t v1,
-                                 uint16_t v2,uint16_t v3,
-                                 uint16_t v4,uint16_t v5,
-                                 uint16_t v6,uint16_t v7)
+              values_to_cube_num(bool v0,bool v1,
+                                 bool v2,bool v3,
+                                 bool v4,bool v5,
+                                 bool v6,bool v7)
 {
     unsigned char cube_num=0;
     if(v0>0) cube_num |= 1 << 0;
@@ -36,7 +62,7 @@ unsigned char marching_cubes_render_algorithm::
     return cube_num;
 }
 unsigned char marching_cubes_render_algorithm::
-              values_to_cube_num(std::array<uint16_t,8> values)
+              values_to_cube_num(std::array<bool,8> values)
 {
     return values_to_cube_num(values[0],values[1],values[2],values[3],
                               values[4],values[5],values[6],values[7]);
@@ -51,8 +77,10 @@ unsigned char marching_cubes_render_algorithm::values_to_cube_num(voxel& v0,
                                                                   voxel& v6,
                                                                   voxel& v7)
 {
-    return values_to_cube_num(v0.value(),v1.value(),v2.value(),v3.value(),
-                              v4.value(),v5.value(),v6.value(),v7.value());
+    return values_to_cube_num(v0.is_solid(),v1.is_solid(),
+                              v2.is_solid(),v3.is_solid(),
+                              v4.is_solid(),v5.is_solid(),
+                              v6.is_solid(),v7.is_solid());
 }
 
 std::bitset<8> marching_cubes_render_algorithm::cube_num_to_values(
@@ -81,12 +109,29 @@ vector3d<float> marching_cubes_render_algorithm::num_to_offset(
     num&0x4?positive_val:negative_val);
 }
 
+material_data* get_voxel_material( std::size_t x,std::size_t y,
+                            std::size_t z,voxel_data* data)
+{
+    std::size_t _size=data->get_size().x;
+    if(x>_size-1||y>_size-1||z>_size-1)
+    {
+        return voxel_material_system::get().get_default_nonsolid();
+    }else
+    {
+        return data->get_voxel(x,y,z).get_material();
+    }
+}
+
+material_data* get_voxel_material(vector3d<std::size_t> pos,voxel_data* data)
+{
+    return get_voxel_material(pos.x,pos.y,pos.z,data);
+}
+
 int16_t get_voxel_value(std::size_t x,std::size_t y,
                         std::size_t z,voxel_data* data)
 {
     std::size_t _size=data->get_size().x;
-    if(x<0||y<0||z<0||
-       x>_size-1||y>_size-1||z>_size-1)
+    if(x>_size-1||y>_size-1||z>_size-1)
     {
         return 0;
     }else
@@ -158,7 +203,8 @@ void marching_cubes_render_algorithm::step( vector3d<float> p0,
                                             vector3d<float> p7,
                                             unsigned char cubeindex,
                                             std::shared_ptr<mesh_data> model,
-                                            voxel_data* data)
+                                            voxel_data* data,
+                                            material_data* material)
 {
     std::bitset<8> v = cube_num_to_values(cubeindex);
 
@@ -302,27 +348,30 @@ void marching_cubes_render_algorithm::step( vector3d<float> p0,
                             edge_vertex_table[tritable[cubeindex][n+1]],
                             edge_gradient_table[tritable[cubeindex][n+1]],
                             edge_vertex_table[tritable[cubeindex][n+2]],
-                            edge_gradient_table[tritable[cubeindex][n+2]]);
+                            edge_gradient_table[tritable[cubeindex][n+2]],
+                            material);
     }
 }
 
 void marching_cubes_render_algorithm::step( axis_aligned_box& box,
                                             unsigned char cubeindex,
                                             std::shared_ptr<mesh_data> model,
-                                            voxel_data* data)
+                                            voxel_data* data,
+                                            material_data* material)
 {
     step(box.get_corner(0),box.get_corner(1),
          box.get_corner(2),box.get_corner(3),
          box.get_corner(4),box.get_corner(5),
          box.get_corner(6),box.get_corner(7),
-         cubeindex, model,data);
+         cubeindex, model,data,material);
 }
 
 void marching_cubes_render_algorithm::step( vector3d<float> pos,
                                             unsigned char cubeindex,
                                             float size,
                                             std::shared_ptr<mesh_data> model,
-                                            voxel_data* data)
+                                            voxel_data* data,
+                                            material_data* material)
 {
         vector3d<float> p0=pos + num_to_offset(0,-size/2,size/2);
         vector3d<float> p1=pos + num_to_offset(1,-size/2,size/2);
@@ -334,23 +383,29 @@ void marching_cubes_render_algorithm::step( vector3d<float> pos,
         vector3d<float> p7=pos + num_to_offset(7,-size/2,size/2);
         step(p0,p1,p2,p3,
              p4,p5,p6,p7,
-             cubeindex,model,data);
+             cubeindex,model,data,material);
 }
 
 void marching_cubes_render_algorithm::step(vector3d<float> pos,
                                           std::shared_ptr<mesh_data> model,
                                           voxel_data* data)
 {
-    std::array<uint16_t,8> n;
+    std::array<material_data*,8> n;
     for(unsigned char i=0; i<8;++i)
     {
-        n[i]=get_voxel_value(pos+num_to_offset(i,0,1),data);
+        n[i]=get_voxel_material(pos+num_to_offset(i,0,1),data);
     }
-    unsigned char cube_num = values_to_cube_num(n);
-    if(cube_num==0||cube_num==0xFF)
-        return;
-    marching_cubes_render_algorithm::step(pos+vector3d<float>(0.5f,0.5f,0.5f),
-                                          cube_num,1.0f,model,data);
+    std::map<material_data*,unsigned char> cube_nums = materials_to_cube_nums(n);
+
+    for(auto& cube_num : cube_nums)
+    {
+
+        if(cube_num.second==0||cube_num.second==0xFF)
+            return;
+        marching_cubes_render_algorithm::step(pos+vector3d<float>(0.5f,0.5f,0.5f),
+                                              cube_num.second,1.0f,model,data,
+                                              cube_num.first);
+    }
 }
 
 void marching_cubes_render_algorithm::process(voxel_model* node,
@@ -359,7 +414,6 @@ void marching_cubes_render_algorithm::process(voxel_model* node,
     voxel_data* data=node->get_render_data();
     voxel_data::size_vector3d size=data->get_size();
     model->reserve(size.x*size.y*size.z);
-    vector3d<int> size_i = size;
     for(int x=-1;x<static_cast<int>(size.x);++x)
     {
         for(int y=-1;y<static_cast<int>(size.y);++y)

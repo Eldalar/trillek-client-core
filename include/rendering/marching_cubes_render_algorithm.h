@@ -17,11 +17,13 @@ class marching_cubes_render_algorithm
         marching_cubes_render_algorithm();
         virtual ~marching_cubes_render_algorithm();
         void process(voxel_model* node, graphics_service* service);
-        static unsigned char values_to_cube_num(uint16_t v0,uint16_t v1,
-                                                uint16_t v2,uint16_t v3,
-                                                uint16_t v4,uint16_t v5,
-                                                uint16_t v6,uint16_t v7);
-        static unsigned char values_to_cube_num(std::array<uint16_t,8> values);
+        static std::map<material_data*,unsigned char> materials_to_cube_nums(
+                                        std::array<material_data*,8> m);
+        static unsigned char values_to_cube_num(bool v0,bool v1,
+                                                bool v2,bool v3,
+                                                bool v4,bool v5,
+                                                bool v6,bool v7);
+        static unsigned char values_to_cube_num(std::array<bool,8> values);
         static unsigned char values_to_cube_num(voxel& v0,voxel& v1,
                                                 voxel& v2,voxel& v3,
                                                 voxel& v4,voxel& v5,
@@ -34,18 +36,21 @@ class marching_cubes_render_algorithm
                          unsigned char num,
                          float size,
                          std::shared_ptr<mesh_data> model,
-                         voxel_data* data);
+                         voxel_data* data,
+                         material_data* material);
         static void step(axis_aligned_box& box,
                          unsigned char num,
                          std::shared_ptr<mesh_data> model,
-                         voxel_data* data);
+                         voxel_data* data,
+                         material_data* material);
         static void step(vector3d<float> p0,vector3d<float> p1,
                          vector3d<float> p2,vector3d<float> p3,
                          vector3d<float> p4,vector3d<float> p5,
                          vector3d<float> p6,vector3d<float> p7,
                          unsigned char cubeindex,
                          std::shared_ptr<mesh_data> model,
-                         voxel_data* data);
+                         voxel_data* data,
+                        material_data* material);
     protected:
     private:
         static vector3d<float> num_to_offset(unsigned char num,

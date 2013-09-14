@@ -13,8 +13,11 @@ class first_person_camera : public camera
     public:
         first_person_camera();
         virtual ~first_person_camera();
-        void mouse_listen(float dx, float dy);
         void render(graphics_service* service);
+        void mouse_moved(std::shared_ptr<event> e);
+        void key_pressed(std::shared_ptr<event> e);
+        void init() override;
+        float speed=10; // units per second
     protected:
     private:
         vector2d<float> rot;

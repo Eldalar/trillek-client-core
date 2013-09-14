@@ -24,26 +24,41 @@ bool sfml_window_service::is_open()
     return sfml_window.isOpen();
 }
 
-void sfml_window_service::open()
+void sfml_window_service::_init()
 {
-    settings_service* settings=_client->get_settings_service();
-    int width=settings->get("window")->get("width")->to_int(800);
-    int height=settings->get("window")->get("height")->to_int(600);
-    int depth=settings->get("window")->get("depth")->to_int(32);
-    std::string title=settings->get("title")->to_string("Trillek");
+    using namespace std::placeholders;
+    settings_service* settings=
+    _client->declare_required_service<settings_service>(this);
+    if(settings)
+    {
+        int width=settings->get("window")->get("width")->to_int(800);
+        int height=settings->get("window")->get("height")->to_int(600);
+        int depth=settings->get("window")->get("depth")->to_int(32);
+        std::string title=settings->get("title")->to_string("Trillek");
+        sf::VideoMode vm(width,height,depth);
+        sfml_window.create(vm,title);
+        sfml_window.setKeyRepeatEnabled(false);
+        sfml_window.setMouseCursorVisible(false);
 
-    sf::VideoMode vm(width,height,depth);
-    sfml_window.create(vm,title);
-    sfml_window.setKeyRepeatEnabled(false);
-    sfml_window.setMouseCursorVisible(false);
-
-    event_service* e_s=this->_client->get_event_service();
-    e_s->send_event(std::make_shared<window_resized_event>(
-                                    width,
-                                    height));
+        events= _client->declare_required_service<event_service>(this);
+        if(events)
+        {
+            events->send_event(std::make_shared<window_resized_event>(
+                                            width,
+                                            height));
+            events->register_for_event(event::exit,
+                        std::bind(&sfml_window_service::close,this,_1));
+        }
+    }
+    this->_client->add_tick_method(client::work,
+                        std::bind(&sfml_window_service::process,this));
+    this->_client->add_tick_method(client::pre_render,
+                        std::bind(&sfml_window_service::activate,this));
+    this->_client->add_tick_method(client::post_render,
+                        std::bind(&sfml_window_service::finish_frame,this));
 }
 
-void sfml_window_service::close()
+void sfml_window_service::close(std::shared_ptr<event> /*e*/)
 {
     sfml_window.close();
 }
@@ -78,55 +93,63 @@ void sfml_window_service::set_mouse_pos(int x, int y)
 void sfml_window_service::process()
 {
     sf::Event event;
-    event_service* e_s=this->_client->get_event_service();
     while(sfml_window.pollEvent(event))
     {
         switch(event.type)
         {
             // Window Events
             case sf::Event::EventType::Closed:
-                this->sfml_window.close();
+                events->send_event(std::make_shared<short_event>(event::exit));
             break;
             case sf::Event::EventType::Resized:
-                e_s->send_event(std::make_shared<window_resized_event>(
+                events->send_event(std::make_shared<window_resized_event>(
                                             event.size.width,
                                             event.size.height));
             break;
             // Keyboard Events
             case sf::Event::EventType::KeyPressed:
-                e_s->send_event(std::make_shared<key_event>(
-                                            true,
+                events->send_event(std::make_shared<key_event>(
+                                            true,false,
                                             sfml_key_convert(event.key.code)));
             break;
             case sf::Event::EventType::KeyReleased:
-                e_s->send_event(std::make_shared<key_event>(
-                                            false,
+                events->send_event(std::make_shared<key_event>(
+                                            false,false,
                                             sfml_key_convert(event.key.code)));
             break;
             // Mouse Events
             case sf::Event::EventType::MouseButtonPressed:
-                e_s->send_event(std::make_shared<mouse_button_event>(
+                events->send_event(std::make_shared<mouse_button_event>(
                                 true,
                                 sfml_mouse_button_convert(event.mouseButton.button)));
             break;
             case sf::Event::EventType::MouseButtonReleased:
-                e_s->send_event(std::make_shared<mouse_button_event>(
+                events->send_event(std::make_shared<mouse_button_event>(
                                 false,
                                 sfml_mouse_button_convert(event.mouseButton.button)));
             break;
             case sf::Event::EventType::MouseMoved:
-                e_s->send_event(std::make_shared<mouse_move_event>(
-                                            event.mouseMove.x,
-                                            event.mouseMove.y));
+            {
+                auto middle=this->sfml_window.getSize();
+                middle.x/=2;middle.y/=2;
+                if(middle.x!=event.mouseMove.x ||
+                    middle.y!=event.mouseMove.y)
+                {
+                    events->send_event(std::make_shared<mouse_move_event>(
+                                                event.mouseMove.x-middle.x,
+                                                event.mouseMove.y-middle.y));
+                    set_mouse_pos(0.5f,0.5f);
+                }
+            }
             break;
             case sf::Event::EventType::MouseWheelMoved:
-                e_s->send_event(std::make_shared<mouse_wheel_event>(
+                events->send_event(std::make_shared<mouse_wheel_event>(
                                             event.mouseWheel.delta));
             break;
-            /*
-                -------- Unused --------------
-                    TODO: Use them all :)
-            */
+
+            //  -------- Unused --------------
+            //      TODO: Use them all :)
+
             case sf::Event::EventType::JoystickButtonPressed:
             break;
             case sf::Event::EventType::JoystickButtonReleased:

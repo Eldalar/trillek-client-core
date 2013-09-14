@@ -15,6 +15,7 @@ class basic_voxel_asset_loader
         basic_voxel_asset_loader();
         virtual ~basic_voxel_asset_loader();
         voxel_data* load(const std::string& file) const override;
+        void init() override;
     protected:
     private:
 };

@@ -43,6 +43,7 @@ class graphics_service
         virtual void do_rotation_z(float rot)=0;
         virtual void register_model(uintptr_t ID,
                                     std::shared_ptr<mesh_data> model)=0;
+        static constexpr char name[]="graphics";
     protected:
         std::shared_ptr<render_algorithm> rendering_algorithm;
         std::shared_ptr<camera> cam;

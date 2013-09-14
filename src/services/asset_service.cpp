@@ -25,12 +25,21 @@ data* asset_service::load(std::string file)
 }
 
 void asset_service::register_asset_loader(const std::string& extension,
-                                          asset_loader* new_asset_loader) {
-    _asset_loaders[extension] = 
+                                          asset_loader* new_asset_loader)
+{
+    _asset_loaders[extension] =
             std::unique_ptr<asset_loader>(new_asset_loader);
 }
 
-void asset_service::register_asset_loader(const std::string& extension, 
+void asset_service::_init()
+{
+    for(auto& _asset_loader : _asset_loaders)
+    {
+        _asset_loader.second->init();
+    }
+}
+
+void asset_service::register_asset_loader(const std::string& extension,
         std::shared_ptr<asset_loader> new_asset_loader) {
     _asset_loaders[extension] = new_asset_loader;
 }

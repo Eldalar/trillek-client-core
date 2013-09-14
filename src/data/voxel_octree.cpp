@@ -4,11 +4,15 @@
 #include <algorithm>
 #include "math/math_general.h"
 #include <iostream>
+#include "client.h"
 
 namespace trillek
 {
 
-voxel_octree::voxel_octree() : _size_exp(0), _has_children(false) {}
+voxel_octree::voxel_octree()
+    : _size_exp(0),_has_children(false)
+{
+}
 voxel_octree::voxel_octree(const voxel_octree& other)
         : _size_exp(other._size_exp), _data(other._data),
         _has_children(other._has_children),_offset(other._offset) {
@@ -55,7 +59,7 @@ std::size_t voxel_octree::get_opaque_volume() const {
             ret += child_ptr->get_opaque_volume();
         }
     } else {
-        if(_data.is_opaque()) {
+        if(_data.is_solid()) {
             ret += get_volume();
         }
     }
@@ -64,7 +68,7 @@ std::size_t voxel_octree::get_opaque_volume() const {
 
 const voxel& voxel_octree::get_voxel() const
 {
-    assert(!_has_children);
+    //assert(!_has_children);
     return _data;
 }
 const voxel& voxel_octree::get_voxel(std::size_t x,
@@ -182,14 +186,27 @@ void voxel_octree::combine_children() {
         }
         _has_children = false;
     } else {
-        std::size_t num_standard = 0;
-        std::size_t num_opaque = 0;
+        /*
+        std::size_t num_full = 0;
+        std::map<material_data*,std::size_t> voxel_distribution;
         for(const voxel_octree_ptr& child : _children) {
-            if(child->_data.is_standard()) ++num_standard;
-            if(child->_data.is_opaque()) ++num_opaque;
+            if(voxel_distribution.find(child->get_voxel().get_material())
+                        !=voxel_distribution.end())
+                voxel_distribution[child->get_voxel().get_material()]++;
+            else
+                voxel_distribution[child->get_voxel().get_material()]=1;
         }
-        _data = voxel(num_standard >= _children.size() / 2,
-                num_opaque >= _children.size() / 2);
+        std::size_t _max=0;
+        material_data* _max_type=NULL;
+        for(auto& voxel_dist : voxel_distribution)
+        {
+            if(voxel_dist.second>_max)
+            {
+                _max_type=voxel_dist.first;
+                _max=voxel_dist.second;
+            }
+        }
+        _data= voxel(_max_type);*/
     }
 }
 

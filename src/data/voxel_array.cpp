@@ -1,6 +1,7 @@
 #include "data/voxel_array.h"
 #include <iostream>
 #include <cassert>
+#include "client.h"
 namespace trillek
 {
 

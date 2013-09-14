@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   voxel_mesh_asset_loader.h
  * Author: Zcool31
  *
@@ -14,11 +14,14 @@
 
 namespace trillek {
 
+class voxel_octree;
+
 class voxel_mesh_asset_loader : public asset_loader {
 public:
     voxel_mesh_asset_loader();
     virtual ~voxel_mesh_asset_loader();
     data* load(const std::string& file) const override;
+    void init();
 };
 
 }

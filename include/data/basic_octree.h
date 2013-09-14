@@ -17,8 +17,8 @@ typedef vector3d<std::size_t> octree_index_t;
  * @brief Basic octree for storing any type
  * Requirements on type T:
  * Must be assignable and copy-constructable
- * Must support comparison - if two instances compare 
- * equal, they are considered redundant and only one 
+ * Must support comparison - if two instances compare
+ * equal, they are considered redundant and only one
  * will be stored.
  */
 template <typename T>
@@ -61,11 +61,11 @@ private:
 };
 
 template <typename T>
-basic_octree<T>::basic_octree() : m_size_exp(0), m_has_children(false), 
+basic_octree<T>::basic_octree() : m_size_exp(0), m_has_children(false),
         m_has_data(false) {}
 template <typename T>
 basic_octree<T>::basic_octree(const basic_octree& other)
-        : m_size_exp(other.m_size_exp), m_has_children(other.m_has_children), 
+        : m_size_exp(other.m_size_exp), m_has_children(other.m_has_children),
         m_has_data(other.m_has_data) {
     if(m_has_children) {
         for(std::size_t i = 0; i != m_children.size(); ++i) {
@@ -78,7 +78,7 @@ basic_octree<T>::basic_octree(const basic_octree& other)
 }
 template <typename T>
 basic_octree<T>::basic_octree(basic_octree&& other)
-        : m_size_exp(other.m_size_exp), m_has_children(other.m_has_children), 
+        : m_size_exp(other.m_size_exp), m_has_children(other.m_has_children),
         m_has_data(other.m_has_data) {
     if(m_has_children) {
         for(std::size_t i = 0; i != m_children.size(); ++i) {
@@ -146,7 +146,7 @@ void basic_octree<T>::set_data(octree_index_t ind, U&& data) {
         if(!m_has_children) {
             split_children();
         }
-        m_children[child_index].get()->set_data(child_access, 
+        m_children[child_index].get()->set_data(child_access,
                 std::forward<U>(data));
         combine_children();
     }
@@ -166,7 +166,7 @@ void basic_octree<T>::unset_data(octree_index_t ind) {
     }
 }
 template <typename T>
-std::pair<std::size_t, octree_index_t> 
+std::pair<std::size_t, octree_index_t>
         basic_octree<T>::compute_child_access(octree_index_t ind) const {
     const octree_index_t s = size();
     assert(ind.x < s.x);
@@ -178,7 +178,7 @@ std::pair<std::size_t, octree_index_t>
     const std::size_t x_bit = (ind.x & mask) != 0;
     const std::size_t zyx_ind = static_cast<std::size_t>(
             (z_bit << 2) | (y_bit << 1) | (x_bit << 0));
-    const octree_index_t zyx_access(ind.x & ~mask, 
+    const octree_index_t zyx_access(ind.x & ~mask,
             ind.y & ~mask, ind.z & ~mask);
     return std::make_pair(zyx_ind, zyx_access);
 }
@@ -192,7 +192,7 @@ void basic_octree<T>::split_children() {
 }
 template <typename T>
 void basic_octree<T>::combine_children() {
-    auto same_data = [](const value_type_ptr& lhs, 
+    auto same_data = [](const value_type_ptr& lhs,
             const value_type& rhs)->bool {
         if(lhs.get() == rhs.get()) {
             return true;
@@ -206,7 +206,7 @@ void basic_octree<T>::combine_children() {
     for(std::size_t i = 0; i != m_children.size(); ++i) {
         assert(!m_children[i].get()->m_has_children);
         if(i == 0) continue;
-        if(!same_data(m_children[i-1].get()->m_data, 
+        if(!same_data(m_children[i-1].get()->m_data,
                 m_children[i].get()->m_data)) {
             return;
         }

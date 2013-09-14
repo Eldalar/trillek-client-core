@@ -16,13 +16,34 @@ input_service::~input_service()
     //dtor
 }
 
-void input_service::init()
+void input_service::tick()
 {
-    event_service* e_s=this->_client->get_event_service();
-    e_s->register_for_event(event::event_type::key,this);
-    e_s->register_for_event(event::event_type::mouse_move,this);
-    e_s->register_for_event(event::event_type::mouse_button,this);
-    e_s->register_for_event(event::event_type::mouse_wheel,this);
+    for(unsigned int k=0;k<keys_pressed.size();++k)
+    {
+        if(keys_pressed[k])
+        {
+            events->send_event(std::make_shared<key_event>
+                    (true,true,(keyboard::key_code)k));
+        }
+    }
+}
+
+void input_service::_init()
+{
+    using namespace std::placeholders;
+    this->_client->add_tick_method(client::work,
+        std::bind(&input_service::tick,this));
+
+    events=this->_client->declare_required_service<event_service>(this);
+    if(events)
+    {
+        std::function<void(std::shared_ptr<event>)> t=std::bind(&service::receive_event,this,std::placeholders::_1);
+        events->register_for_event(event::event_type::key,this);
+        events->register_for_event(event::event_type::mouse_move,
+            std::bind(&input_service::mouse_move,this,_1));
+        events->register_for_event(event::event_type::mouse_button,this);
+        events->register_for_event(event::event_type::mouse_wheel,this);
+    }
 }
 
 void input_service::receive_event(std::shared_ptr<event> e)
@@ -30,15 +51,20 @@ void input_service::receive_event(std::shared_ptr<event> e)
     auto type=e->get_type();
     if(type==event::key) {
         auto k_e=std::dynamic_pointer_cast<key_event>(e);
-        this->keys_pressed[k_e->code]=k_e->pressed;
-        if(k_e->pressed)
-            std::cerr << "Key pressed: " << k_e->code << std::endl;
-        else
-            std::cerr << "Key released: " << k_e->code << std::endl;
-        if(k_e->code==keyboard::key_code::escape)
-            this->_client->get_window_service()->close();
-        else if(k_e->code=='e' && k_e->pressed)
-            toggle_trap_mouse();
+        if(!k_e->continuation)
+        {
+            this->keys_pressed[k_e->code]=k_e->pressed;
+            if(k_e->pressed)
+                std::cerr << "Key pressed: " << k_e->code << std::endl;
+            else
+                std::cerr << "Key released: " << k_e->code << std::endl;
+            if(k_e->code==keyboard::key_code::escape)
+            {
+                events->send_event(std::make_shared<short_event>(event::exit));
+            }
+            else if(k_e->code=='e' && k_e->pressed)
+                toggle_trap_mouse();
+        }
     }else if(type==event::mouse_move) {
         auto mm_e=std::dynamic_pointer_cast<mouse_move_event>(e);
         this->mouse_move(mm_e);
@@ -49,35 +75,13 @@ void input_service::receive_event(std::shared_ptr<event> e)
     }
 }
 
-void input_service::mouse_move(std::shared_ptr<mouse_move_event> e)
+void input_service::mouse_move(std::shared_ptr<event> e)
 {
-    if(trap_mouse){
-        window_service* w_s=this->_client->get_window_service();
-        vector2d<unsigned int> s=w_s->get_size();
-        int dx=e->x-s.x/2;
-        int dy=e->y-s.y/2;
-        if((dx!=0 ||dy!=0))
-        {
-            w_s->set_mouse_pos(0.5f,0.5f);
-        }
-
-        for(auto listener : mouse_listeners)
-        {
-            listener->mouse_listen(dx,dy);
-        }
-    }else
-    {
-    }
+    auto event=std::dynamic_pointer_cast<mouse_move_event>(e);
 }
 
 void input_service::toggle_trap_mouse() {
     trap_mouse = !trap_mouse;
-}
-
-void input_service::register_mouse_listener(
-                            std::shared_ptr<mouse_listener> listener)
-{
-    mouse_listeners.push_back(listener);
 }
 
 }

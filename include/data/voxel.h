@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <stdint.h>
+#include "data/material_data.h"
 
 namespace trillek
 {
@@ -10,11 +11,11 @@ namespace trillek
 class voxel {
 public:
     voxel();
-    voxel(bool standard, bool opaque);
+    voxel(material_data* material);
+    //voxel(bool a, bool b):standard(a),opaque(b){};
     virtual ~voxel();
 
-    bool is_standard() const;
-    bool is_opaque() const;
+    bool is_solid() const;
     uint16_t value() const;
     /**
      * Average up the voxels in this range
@@ -36,10 +37,10 @@ public:
         return voxel(num_standard > half_total,
                 num_opaque > half_total);
     }
+    material_data* get_material() const{return _material;}
 protected:
 private:
-    bool standard;
-    bool opaque;
+    material_data* _material;
 };
 
 bool operator ==(const voxel& lhs, const voxel& rhs);

@@ -7,14 +7,16 @@
 namespace trillek
 {
 
+class event_service;
+
 class sfml_window_service : public window_service
 {
     public:
         sfml_window_service(client* _client);
         virtual ~sfml_window_service();
         bool is_open() override;
-        void open() override;
-        void close() override;
+        void _init() override;
+        void close(std::shared_ptr<event> /*e*/);
         void activate() override;
         void finish_frame() override;
         void process() override;
@@ -24,6 +26,7 @@ class sfml_window_service : public window_service
         void receive_event(event_shared_ptr) override {}
     protected:
     private:
+        event_service* events;
         sf::Window sfml_window;
 };
 
